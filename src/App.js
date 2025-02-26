@@ -27,7 +27,7 @@ import ChildDetail from "./child/ChildDetail";
 import ChildForm from "./child/ChildForm";
 import ChildUpdate from "./child/UpdateChildForm";
 import ChildUpdateParent from "./child/UpdateParentChild";
-import Rapportgenrator from "./child/RaportGenrator";
+import Rapportgenrator from "./child/RaportGenerator";
 import LocationTracker from "./child/LocationTracker"; // Importer le nouveau composant
 // Vision UI Dashboard React routes
 import routes from "routes";

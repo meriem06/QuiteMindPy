@@ -84,7 +84,7 @@ const ReportGenerator = () => {
         }
         const data = await response.json();
         console.log("Received historical data:", data); // Debugging
-
+  
         // Formater les données pour recharts
         const formattedData = data.map((measurement) => ({
           id: measurement.id,
@@ -92,16 +92,16 @@ const ReportGenerator = () => {
           heart_beat: measurement.heart_beat,
           temperature: measurement.temperature,
         }));
-
-        // Initialiser chartData avec les données historiques
+  
+        console.log("Formatted chartData:", formattedData); // Debugging
         setChartData(formattedData);
       } catch (error) {
         console.error("Erreur :", error);
       }
     };
-
+  
     fetchHistoricalData();
-  }, [childid]); // Cette récupération ne dépend que de `childid`
+  }, [childid]);
 
   const getEmotionalState = (heartBeat, temperature) => {
     if (heartBeat > 100 && temperature > 37) return "Stressé";
@@ -127,9 +127,7 @@ const ReportGenerator = () => {
         <h2 className="text-2xl font-bold white-text mb-8">Rapport en temps réel</h2>
 
         {reports.length > 0 && reports[0].data && reports[0].data[0] ? (
-         
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-             <br></br> 
             {/* Cadre pour le texte animé */}
             <Card className="dark-background">
               <CardContent className="p-8">
@@ -176,7 +174,7 @@ const ReportGenerator = () => {
                 </AnimatePresence>
               </CardContent>
             </Card>
-            <br></br> 
+
             {/* Cadre pour l'état émotionnel */}
             <Card className="dark-background">
               <CardContent className="p-8">
@@ -213,7 +211,7 @@ const ReportGenerator = () => {
                 </AnimatePresence>
               </CardContent>
             </Card>
-            <br></br> 
+
             {/* Cadre pour l'état de santé */}
             <Card className="dark-background">
               <CardContent className="p-8">
@@ -250,7 +248,7 @@ const ReportGenerator = () => {
                 </AnimatePresence>
               </CardContent>
             </Card>
-            <br></br> 
+
             {/* Cadre pour la carte OpenStreetMap */}
             <Card className="col-span-1 md:col-span-2">
               <CardContent className="p-8">
@@ -261,7 +259,7 @@ const ReportGenerator = () => {
                 />
               </CardContent>
             </Card>
-            <br></br> 
+
             {/* Cadre pour le graphique des battements de cœur */}
             <Card className="col-span-1 md:col-span-2">
               <CardContent className="p-8">
@@ -281,7 +279,7 @@ const ReportGenerator = () => {
                 </BarChart>
               </CardContent>
             </Card>
-            <br></br> 
+
             {/* Cadre pour le graphique de la température */}
             <Card className="col-span-1 md:col-span-2">
               <CardContent className="p-8">

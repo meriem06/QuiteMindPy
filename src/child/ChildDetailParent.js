@@ -5,7 +5,7 @@ import DashboardNavbar from "examples/Navbars/DashboardNavbar"; // Chemin correc
 import Card from "@mui/material/Card";
 import { Box, Button, Typography } from "@mui/material";
 import "./ChildDetail.css"; // Import du fichier CSS
-import RealtimeAlert from  "./RealTimeAlert";
+import RealtimeAlert from "./RealTimeAlert";
 
 const ChildDetail = () => {
   const history = useHistory();
