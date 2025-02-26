@@ -1,46 +1,18 @@
-/*!
-
-=========================================================
-* Vision UI Free React - v1.0.0
-=========================================================
-
-* Product Page: https://www.creative-tim.com/product/vision-ui-free-react
-* Copyright 2021 Creative Tim (https://www.creative-tim.com/)
-* Licensed under MIT (https://github.com/creativetimofficial/vision-ui-free-react/blob/master LICENSE.md)
-
-* Design and Coded by Simmmple & Creative Tim
-
-=========================================================
-
-* The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-*/
-
 import { useState, useEffect } from "react";
-
-// react-router components
 import { useLocation, Link } from "react-router-dom";
-
-// prop-types is a library for typechecking of props.
 import PropTypes from "prop-types";
-
-// @material-ui core components
 import AppBar from "@mui/material/AppBar";
 import Toolbar from "@mui/material/Toolbar";
 import IconButton from "@mui/material/IconButton";
 import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
 import Icon from "@mui/material/Icon";
-
-// Vision UI Dashboard React components
+import Badge from "@mui/material/Badge";
 import VuiBox from "components/VuiBox";
 import VuiTypography from "components/VuiTypography";
 import VuiInput from "components/VuiInput";
-
-// Vision UI Dashboard React example components
 import Breadcrumbs from "examples/Breadcrumbs";
 import NotificationItem from "examples/Items/NotificationItem";
-
-// Custom styles for DashboardNavbar
 import {
   navbar,
   navbarContainer,
@@ -48,62 +20,123 @@ import {
   navbarIconButton,
   navbarMobileMenu,
 } from "examples/Navbars/DashboardNavbar/styles";
+import { useVisionUIController, setTransparentNavbar, setMiniSidenav, setOpenConfigurator } from "context";
+import team2 from "assets/images/notification-icon.png";
+import RealtimeAlert from "child/RealTimeAlert";
 
-// Vision UI Dashboard React context
-import {
-  useVisionUIController,
-  setTransparentNavbar,
-  setMiniSidenav,
-  setOpenConfigurator,
-} from "context";
-
-// Images
-import team2 from "assets/images/team-2.jpg";
-import logoSpotify from "assets/images/small-logos/logo-spotify.svg";
-
-function DashboardNavbar({ absolute, light, isMini }) {
-  const [navbarType, setNavbarType] = useState();
+const DashboardNavbar = ({ absolute, light, isMini, id }) => {
+  const [notifications, setNotifications] = useState([]);
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [navbarType, setNavbarType] = useState("static");
   const [controller, dispatch] = useVisionUIController();
   const { miniSidenav, transparentNavbar, fixedNavbar, openConfigurator } = controller;
-  const [openMenu, setOpenMenu] = useState(false);
-  const route = useLocation().pathname.split("/").slice(1);
+  const [openMenu, setOpenMenu] = useState(null);
+  const [pageTitle, setPageTitle] = useState("QuietMind"); // Titre par défaut
+  const location = useLocation();
+  const route = location.pathname.split("/").slice(1);
 
+  // Fonction pour gérer les nouvelles alertes
+  const handleNewAlert = (alert) => {
+    console.log("New alert received:", alert); // Vérifiez les données reçues
+    setNotifications((prevNotifications) => {
+      const newNotifications = [alert, ...prevNotifications];
+      console.log("Updated notifications:", newNotifications); // Vérifiez l'état mis à jour
+      return newNotifications;
+    });
+    setNotificationCount((prevCount) => prevCount + 1);
+  };
+
+  // Se connecter à la route SSE pour recevoir les alertes en temps réel
   useEffect(() => {
-    // Setting the navbar type
+    if (!id) return; // Ne pas se connecter si l'ID est manquant
+
+    const eventSource = new EventSource(`http://localhost:3001/api/alerts/realtime/${id}`);
+
+    eventSource.onmessage = (event) => {
+      const newAlert = JSON.parse(event.data);
+      handleNewAlert(newAlert); // Mettre à jour les notifications
+    };
+
+    eventSource.onerror = (error) => {
+      console.error("Erreur de connexion SSE :", error);
+      eventSource.close();
+    };
+
+    return () => {
+      eventSource.close(); // Fermer la connexion SSE lors du démontage du composant
+    };
+  }, [id]);
+
+  // Charger les notifications existantes
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const response = await fetch(`http://localhost:3001/api/sensors/alerts/${id}`);
+        console.log("New alert received1", response);
+        if (!response.ok) {
+          throw new Error("Erreur lors de la récupération des notifications");
+        }
+        const data = await response.json();
+        console.log("New alert received:", data);
+        setNotifications(data);
+        setNotificationCount(data.length);
+      } catch (error) {
+        console.error("Erreur :", error);
+      }
+    };
+
+    fetchNotifications();
+  }, [id]);
+
+  // Gestion de la barre de navigation transparente
+  useEffect(() => {
     if (fixedNavbar) {
       setNavbarType("sticky");
     } else {
       setNavbarType("static");
     }
 
-    // A function that sets the transparent state of the navbar.
     function handleTransparentNavbar() {
       setTransparentNavbar(dispatch, (fixedNavbar && window.scrollY === 0) || !fixedNavbar);
     }
 
-    /** 
-     The event listener that's calling the handleTransparentNavbar function when 
-     scrolling the window.
-    */
     window.addEventListener("scroll", handleTransparentNavbar);
-
-    // Call the handleTransparentNavbar function to set the state with the initial value.
     handleTransparentNavbar();
 
-    // Remove event listener on cleanup
     return () => window.removeEventListener("scroll", handleTransparentNavbar);
   }, [dispatch, fixedNavbar]);
 
   const handleMiniSidenav = () => setMiniSidenav(dispatch, !miniSidenav);
   const handleConfiguratorOpen = () => setOpenConfigurator(dispatch, !openConfigurator);
   const handleOpenMenu = (event) => setOpenMenu(event.currentTarget);
-  const handleCloseMenu = () => setOpenMenu(false);
+  const handleCloseMenu = () => setOpenMenu(null);
 
-  // Render the notifications menu
+  // Supprimer une notification
+  const handleDeleteNotification = async (alertId) => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/sensors/alerts/${alertId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Erreur lors de la suppression de la notification");
+      }
+
+      setNotifications((prevNotifications) =>
+        prevNotifications.filter((notification) => notification.id !== alertId)
+      );
+      setNotificationCount((prevCount) => prevCount - 1);
+    } catch (error) {
+      console.error("Erreur :", error);
+    }
+  };
+
+  console.log("Rendering notifications:", notifications); // Vérifiez les données
+
+  // Rendu du menu des notifications
   const renderMenu = () => (
     <Menu
       anchorEl={openMenu}
-      anchorReference={null}
       anchorOrigin={{
         vertical: "bottom",
         horizontal: "left",
@@ -112,126 +145,112 @@ function DashboardNavbar({ absolute, light, isMini }) {
       onClose={handleCloseMenu}
       sx={{ mt: 2 }}
     >
-      <NotificationItem
-        image={<img src={team2} alt="person" />}
-        title={["New message", "from Laur"]}
-        date="13 minutes ago"
-        onClick={handleCloseMenu}
-      />
-      <NotificationItem
-        image={<img src={logoSpotify} alt="person" />}
-        title={["New album", "by Travis Scott"]}
-        date="1 day"
-        onClick={handleCloseMenu}
-      />
-      <NotificationItem
-        color="text"
-        image={
-          <Icon fontSize="small" sx={{ color: ({ palette: { white } }) => white.main }}>
-            payment
-          </Icon>
-        }
-        title={["", "Payment successfully completed"]}
-        date="2 days"
-        onClick={handleCloseMenu}
-      />
+      {notifications.map((notification) => (
+        <MenuItem key={notification.id} onClick={handleCloseMenu}>
+          <NotificationItem
+            image={<img src={team2 || "/placeholder.svg"} alt="person" />}
+            title={[notification.type, notification.message]}
+            date={new Date(notification.created_at).toLocaleString()}
+          />
+          <IconButton
+            size="small"
+            color="error"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteNotification(notification.id);
+            }}
+          >
+            <Icon>delete</Icon>
+          </IconButton>
+        </MenuItem>
+      ))}
     </Menu>
   );
 
   return (
-    <AppBar
-      position={absolute ? "absolute" : navbarType}
-      color="inherit"
-      sx={(theme) => navbar(theme, { transparentNavbar, absolute, light })}
-    >
-      <Toolbar sx={(theme) => navbarContainer(theme)}>
-        <VuiBox color="inherit" mb={{ xs: 1, md: 0 }} sx={(theme) => navbarRow(theme, { isMini })}>
-          <Breadcrumbs icon="home" title={route[route.length - 1]} route={route} light={light} />
-        </VuiBox>
-        {isMini ? null : (
-          <VuiBox sx={(theme) => navbarRow(theme, { isMini })}>
-            <VuiBox pr={1}>
-              <VuiInput
-                placeholder="Type here..."
-                icon={{ component: "search", direction: "left" }}
-                sx={({ breakpoints }) => ({
-                  [breakpoints.down("sm")]: {
-                    maxWidth: "80px",
-                  },
-                  [breakpoints.only("sm")]: {
-                    maxWidth: "80px",
-                  },
-                  backgroundColor: "info.main !important",
-                })}
-              />
-            </VuiBox>
-            <VuiBox color={light ? "white" : "inherit"}>
-              <Link to="/authentication/sign-in">
-                <IconButton sx={navbarIconButton} size="small">
-                  <Icon
-                    sx={({ palette: { dark, white } }) => ({
-                      color: light ? white.main : dark.main,
-                    })}
-                  >
-                    account_circle
-                  </Icon>
-                  <VuiTypography
-                    variant="button"
-                    fontWeight="medium"
-                    color={light ? "white" : "dark"}
-                  >
-                    Sign in
-                  </VuiTypography>
-                </IconButton>
-              </Link>
-              <IconButton
-                size="small"
-                color="inherit"
-                sx={navbarMobileMenu}
-                onClick={handleMiniSidenav}
-              >
-                <Icon className={"text-white"}>{miniSidenav ? "menu_open" : "menu"}</Icon>
-              </IconButton>
-              <IconButton
-                size="small"
-                color="inherit"
-                sx={navbarIconButton}
-                onClick={handleConfiguratorOpen}
-              >
-                <Icon>settings</Icon>
-              </IconButton>
-              <IconButton
-                size="small"
-                color="inherit"
-                sx={navbarIconButton}
-                aria-controls="notification-menu"
-                aria-haspopup="true"
-                variant="contained"
-                onClick={handleOpenMenu}
-              >
-                <Icon className={light ? "text-white" : "text-dark"}>notifications</Icon>
-              </IconButton>
-              {renderMenu()}
-            </VuiBox>
+    <>
+      <RealtimeAlert idChild={id} onNewAlert={handleNewAlert} />
+      <AppBar
+        position={absolute ? "absolute" : navbarType}
+        color="inherit"
+        sx={(theme) => navbar(theme, { transparentNavbar, absolute, light })}
+      >
+        <Toolbar sx={(theme) => navbarContainer(theme)}>
+          <VuiBox color="inherit" mb={{ xs: 1, md: 0 }} sx={(theme) => navbarRow(theme, { isMini })}>
+            <Breadcrumbs icon="home" title={pageTitle} route={route} light={light} />
           </VuiBox>
-        )}
-      </Toolbar>
-    </AppBar>
+          {isMini ? null : (
+            <VuiBox sx={(theme) => navbarRow(theme, { isMini })}>
+              <VuiBox pr={1}>
+                <VuiInput
+                  placeholder="Type here..."
+                  icon={{ component: "search", direction: "left" }}
+                  sx={({ breakpoints }) => ({
+                    [breakpoints.down("sm")]: {
+                      maxWidth: "80px",
+                    },
+                    [breakpoints.only("sm")]: {
+                      maxWidth: "80px",
+                    },
+                    backgroundColor: "info.main !important",
+                  })}
+                />
+              </VuiBox>
+              <VuiBox color={light ? "white" : "inherit"}>
+                <Link to="/authentication/sign-in">
+                  <IconButton sx={navbarIconButton} size="small">
+                    <Icon
+                      sx={({ palette: { dark, white } }) => ({
+                        color: light ? white.main : dark.main,
+                      })}
+                    >
+                      account_circle
+                    </Icon>
+                    <VuiTypography variant="button" fontWeight="medium" color={light ? "white" : "dark"}>
+                      Sign in
+                    </VuiTypography>
+                  </IconButton>
+                </Link>
+                <IconButton size="small" color="inherit" sx={navbarMobileMenu} onClick={handleMiniSidenav}>
+                  <Icon className={"text-white"}>{miniSidenav ? "menu_open" : "menu"}</Icon>
+                </IconButton>
+                <IconButton size="small" color="inherit" sx={navbarIconButton} onClick={handleConfiguratorOpen}>
+                  <Icon>settings</Icon>
+                </IconButton>
+                <IconButton
+                  size="small"
+                  color="inherit"
+                  sx={navbarIconButton}
+                  aria-controls="notification-menu"
+                  aria-haspopup="true"
+                  onClick={handleOpenMenu}
+                >
+                  <Badge badgeContent={notificationCount} color="error">
+                    <Icon className={light ? "text-white" : "text-dark"}>notifications</Icon>
+                  </Badge>
+                </IconButton>
+                {renderMenu()}
+              </VuiBox>
+            </VuiBox>
+          )}
+        </Toolbar>
+      </AppBar>
+    </>
   );
-}
-
-// Setting default values for the props of DashboardNavbar
-DashboardNavbar.defaultProps = {
-  absolute: false,
-  light: false,
-  isMini: false,
 };
 
-// Typechecking props for the DashboardNavbar
 DashboardNavbar.propTypes = {
   absolute: PropTypes.bool,
   light: PropTypes.bool,
   isMini: PropTypes.bool,
+  id: PropTypes.string,
+};
+
+DashboardNavbar.defaultProps = {
+  absolute: false,
+  light: false,
+  isMini: false,
+  id: null,
 };
 
 export default DashboardNavbar;

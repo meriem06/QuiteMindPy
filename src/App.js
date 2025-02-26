@@ -27,7 +27,8 @@ import ChildDetail from "./child/ChildDetail";
 import ChildForm from "./child/ChildForm";
 import ChildUpdate from "./child/UpdateChildForm";
 import ChildUpdateParent from "./child/UpdateParentChild";
-
+import Rapportgenrator from "./child/RaportGenrator";
+import LocationTracker from "./child/LocationTracker"; // Importer le nouveau composant
 // Vision UI Dashboard React routes
 import routes from "routes";
 
@@ -169,8 +170,11 @@ export default function App() {
         <Route exact path="/add" component={ChildForm} /> {/* Route pour l'ajout */}
         <Route exact path="/edit/:id" component={ChildUpdate} /> 
         <Route path="/edit/Parent/:id/:parentId" component={ChildUpdateParent} />
+        <Route path="/rapport/:childid" component={Rapportgenrator} />
+        <Route path="/localisation/:childid" element={<LocationTracker />} /> 
         <Redirect from="*" to="/dashboard" />
       </Switch>
+  
     </ThemeProvider>
   );
 }

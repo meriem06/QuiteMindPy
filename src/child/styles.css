@@ -1,0 +1,16 @@
+/* src/styles/styles.css */
+
+.white-text {
+  color: white !important;
+}
+
+  
+  .dark-background {
+    background-color: #1f2937; /* Couleur de fond sombre */
+  }
+  
+  .graph-title {
+    font-size: 1.25rem; /* Taille de police pour les titres des graphiques */
+    font-weight: bold;
+    margin-bottom: 1rem; /* Espacement en bas */
+  }

@@ -1,5 +1,5 @@
 @import url('https://fonts.googleapis.com/css?family=Poppins:400,500,600,700&display=swap');
-* {
+*{
   margin: 0;
   padding: 0;
   outline: none;
@@ -62,7 +62,7 @@ form .form-row .textarea {
   height: 100%;
   border: none;
   font-size: 17px;
-  color: #666; /* Texte en gris */
+  color: #000000; /* Texte en gris */
 }
 
 .input-data input:focus ~ label,
@@ -71,7 +71,7 @@ form .form-row .textarea {
 .textarea textarea:valid ~ label {
   transform: translateY(-20px);
   font-size: 14px;
-  color: #4c4f52; /* Couleur du label au focus */
+  color: #000000; /* Couleur du label au focus */
 }
 
 .textarea textarea {
@@ -85,7 +85,7 @@ form .form-row .textarea {
   bottom: 10px;
   font-size: 16px;
   transition: all 0.3s ease;
-  color: #666; /* Texte en gris */
+  color: #000000; /* Texte en gris */
 }
 
 .textarea label {
@@ -106,7 +106,7 @@ form .form-row .textarea {
   content: "";
   height: 2px;
   width: 100%;
-  background: #3498db;
+  background: #060f15;
   transform: scaleX(0);
   transform-origin: center;
   transition: transform 0.3s ease;
