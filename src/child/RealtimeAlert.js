@@ -3,16 +3,32 @@ import { useEffect } from "react";
 const RealtimeAlert = ({ idChild, onNewMeasurement }) => {
   const homeLocation = { latitude: 48.8566, longitude: 2.3522 };
 
-  const sendAlertToBackend = async (message, type, id_mesure) => {
+  const sendAlertToBackend = async (message, type, id_mesure, sound = null) => {
     if (!id_mesure) {
       console.error("ID de mesure invalide :", id_mesure);
       return;
     }
-
+  
     try {
-      console.log("Envoi de l'alerte au backend :", { message, type, id_mesure });
-
-      const response = await fetch("http://localhost:3001/api/sensors/alerts", {
+      // Vérifier si une alerte similaire existe déjà aujourd'hui
+      const checkResponse = await fetch(
+        `http://localhost:3001/api/sensors/alerts/check/${type}/${id_mesure}`
+      );
+  
+      if (!checkResponse.ok) {
+        console.error("Erreur lors de la vérification de l'alerte :", checkResponse.statusText);
+        return;
+      }
+  
+      const checkData = await checkResponse.json();
+  
+      if (checkData.exists) {
+        console.log("Alerte déjà enregistrée aujourd'hui.");
+        return;
+      }
+  
+      // Insérer la nouvelle alerte
+      const insertResponse = await fetch("http://localhost:3001/api/sensors/alerts", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -21,13 +37,14 @@ const RealtimeAlert = ({ idChild, onNewMeasurement }) => {
           message,
           type,
           id_mesure,
+          sound: sound !== null ? String(sound) : null,
         }),
       });
-
-      if (!response.ok) {
-        console.error("Erreur lors de l'enregistrement de l'alerte :", response.statusText);
+  
+      if (!insertResponse.ok) {
+        console.error("Erreur lors de l'enregistrement de l'alerte :", insertResponse.statusText);
       } else {
-        const responseData = await response.json();
+        const responseData = await insertResponse.json();
         console.log("Alerte enregistrée avec succès :", responseData);
       }
     } catch (error) {
@@ -55,7 +72,7 @@ const RealtimeAlert = ({ idChild, onNewMeasurement }) => {
       Notification.requestPermission().then((permission) => {
         if (permission !== "granted") {
           console.warn("Permission de notification refusée.");
-        return;
+          return;
         }
       });
     }
@@ -67,7 +84,6 @@ const RealtimeAlert = ({ idChild, onNewMeasurement }) => {
     };
 
     eventSource.onmessage = (event) => {
-     // console.log("Données reçues :", event.data);
       if (!event.data) {
         console.error("Aucune donnée reçue ou valeur invalide :", event.data);
         return;
@@ -75,33 +91,54 @@ const RealtimeAlert = ({ idChild, onNewMeasurement }) => {
 
       try {
         const data = JSON.parse(event.data);
-        const { id, heart_beat, temperature, Latitude, Longitude } = data;
+        const { id, Heartbeat, Temperature, Latitude, Longitude, sound } = data; // Utiliser les bonnes clés
 
         if (
           id === undefined ||
-          heart_beat === undefined ||
-          temperature === undefined ||
+          Heartbeat === undefined ||
+          Temperature === undefined ||
           Latitude === undefined ||
-          Longitude === undefined
+          Longitude === undefined ||
+          sound === undefined
         ) {
           console.error("Données SSE incomplètes :", data);
           return;
         }
 
-       // console.log("Nouvelle mesure reçue :", { id, heart_beat, temperature, Latitude, Longitude });
-
         if (onNewMeasurement) {
           onNewMeasurement(id);
         }
 
-        if (heart_beat > 140 || temperature > 38.5) {
-          const message = `⚠️ Crise détectée ! FC: ${heart_beat} bpm | Temp: ${temperature}°C`;
+        // Vérifier les conditions pour envoyer une alerte
+        if (Heartbeat > 140 || Temperature > 38.5) {
+          const message = `⚠️ Crise détectée ! FC: ${Heartbeat} bpm | Temp: ${Temperature}°C`;
           sendAlertToBackend(message, "crise", id);
+
+          // Envoyer un e-mail d'alerte
+          const subject = "Alerte : Crise détectée";
+          const text = `Une crise a été détectée pour l'enfant ${idChild}. Détails : ${message}`;
+          // Ajouter ici la logique pour envoyer un e-mail
         }
 
         if (!isWithinSafeZone(Latitude, Longitude)) {
           const message = `⚠️ Enfant hors zone sécurisée ! 📍 Localisation : ${Latitude}, ${Longitude}`;
           sendAlertToBackend(message, "hors_zone", id);
+
+          // Envoyer un e-mail d'alerte
+          const subject = "Alerte : Enfant hors zone sécurisée";
+          const text = `L'enfant ${idChild} est hors de la zone sécurisée. Détails : ${message}`;
+          // Ajouter ici la logique pour envoyer un e-mail
+        }
+
+        // Vérifier le niveau sonore
+        if (sound > 80) { // Seuil de niveau sonore pour déclencher une alerte
+          const message = `⚠️ Niveau sonore élevé détecté ! 🔊 Niveau : ${sound} dB`;
+          sendAlertToBackend(message, "sonore", id, sound);
+
+          // Envoyer un e-mail d'alerte
+          const subject = "Alerte : Niveau sonore élevé";
+          const text = `Un niveau sonore élevé a été détecté pour l'enfant ${idChild}. Détails : ${message}`;
+          // Ajouter ici la logique pour envoyer un e-mail
         }
       } catch (error) {
         console.error("Erreur lors de l'analyse JSON des données SSE :", error, event.data);

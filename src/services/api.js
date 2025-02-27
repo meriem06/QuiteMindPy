@@ -41,9 +41,9 @@ export const updateChild = async (id, childData) => {
     throw error
   }
 }
-export const updateChildGeneral = async (id, parentId, childData) => {
+export const updateChildGeneral = async (id , childData) => {
   try {
-    const response = await axios.put(`${API_URL}/${id}/${parentId}`, childData);
+    const response = await axios.put(`${API_URL}/${id}`, childData);
     return response.data;
   } catch (error) {
     console.error("Erreur lors de la mise à jour de l'enfant :", error.response?.data || error.message);

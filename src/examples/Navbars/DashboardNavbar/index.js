@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useLocation, Link } from "react-router-dom";
 import PropTypes from "prop-types";
 import AppBar from "@mui/material/AppBar";
@@ -22,7 +22,6 @@ import {
 } from "examples/Navbars/DashboardNavbar/styles";
 import { useVisionUIController, setTransparentNavbar, setMiniSidenav, setOpenConfigurator } from "context";
 import team2 from "assets/images/notification-icon.png";
-import RealtimeAlert from "child/RealTimeAlert";
 
 const DashboardNavbar = ({ absolute, light, isMini, id }) => {
   const [notifications, setNotifications] = useState([]);
@@ -35,58 +34,36 @@ const DashboardNavbar = ({ absolute, light, isMini, id }) => {
   const location = useLocation();
   const route = location.pathname.split("/").slice(1);
 
-  // Fonction pour gérer les nouvelles alertes
-  const handleNewAlert = (alert) => {
-    console.log("New alert received:", alert); // Vérifiez les données reçues
-    setNotifications((prevNotifications) => {
-      const newNotifications = [alert, ...prevNotifications];
-      console.log("Updated notifications:", newNotifications); // Vérifiez l'état mis à jour
-      return newNotifications;
-    });
-    setNotificationCount((prevCount) => prevCount + 1);
-  };
-
-  // Se connecter à la route SSE pour recevoir les alertes en temps réel
-  useEffect(() => {
-    if (!id) return; // Ne pas se connecter si l'ID est manquant
-
-    const eventSource = new EventSource(`http://localhost:3001/api/alerts/realtime/${id}`);
-
-    eventSource.onmessage = (event) => {
-      const newAlert = JSON.parse(event.data);
-      handleNewAlert(newAlert); // Mettre à jour les notifications
-    };
-
-    eventSource.onerror = (error) => {
-      console.error("Erreur de connexion SSE :", error);
-      eventSource.close();
-    };
-
-    return () => {
-      eventSource.close(); // Fermer la connexion SSE lors du démontage du composant
-    };
-  }, [id]);
-
-  // Charger les notifications existantes
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      try {
-        const response = await fetch(`http://localhost:3001/api/sensors/alerts/${id}`);
-        console.log("New alert received1", response);
-        if (!response.ok) {
-          throw new Error("Erreur lors de la récupération des notifications");
-        }
-        const data = await response.json();
-        console.log("New alert received:", data);
+  // Fonction pour charger les notifications existantes
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/sensors/alerts/${id}`);
+      if (!response.ok) {
+        throw new Error("Erreur lors de la récupération des notifications");
+      }
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        console.log("Notifications existantes :", data);
         setNotifications(data);
         setNotificationCount(data.length);
-      } catch (error) {
-        console.error("Erreur :", error);
+      } else {
+        console.error("Données invalides reçues :", data);
+        setNotifications([]);
+        setNotificationCount(0);
       }
-    };
-
-    fetchNotifications();
+    } catch (error) {
+      console.error("Erreur :", error);
+      setNotifications([]);
+      setNotificationCount(0);
+    }
   }, [id]);
+
+  // Charger les notifications existantes au montage du composant
+  useEffect(() => {
+    if (id) {
+      fetchNotifications();
+    }
+  }, [id, fetchNotifications]);
 
   // Gestion de la barre de navigation transparente
   useEffect(() => {
@@ -122,10 +99,8 @@ const DashboardNavbar = ({ absolute, light, isMini, id }) => {
         throw new Error("Erreur lors de la suppression de la notification");
       }
 
-      setNotifications((prevNotifications) =>
-        prevNotifications.filter((notification) => notification.id !== alertId)
-      );
-      setNotificationCount((prevCount) => prevCount - 1);
+      // Recharger les notifications après suppression
+      await fetchNotifications();
     } catch (error) {
       console.error("Erreur :", error);
     }
@@ -145,31 +120,34 @@ const DashboardNavbar = ({ absolute, light, isMini, id }) => {
       onClose={handleCloseMenu}
       sx={{ mt: 2 }}
     >
-      {notifications.map((notification) => (
-        <MenuItem key={notification.id} onClick={handleCloseMenu}>
-          <NotificationItem
-            image={<img src={team2 || "/placeholder.svg"} alt="person" />}
-            title={[notification.type, notification.message]}
-            date={new Date(notification.created_at).toLocaleString()}
-          />
-          <IconButton
-            size="small"
-            color="error"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDeleteNotification(notification.id);
-            }}
-          >
-            <Icon>delete</Icon>
-          </IconButton>
-        </MenuItem>
-      ))}
+      {notifications && notifications.length > 0 ? (
+        notifications.map((notification) => (
+          <MenuItem key={notification.id} onClick={handleCloseMenu}>
+            <NotificationItem
+              image={<img src={team2 || "/placeholder.svg"} alt="person" />}
+              title={[notification.alert_type, notification.alert_message]} // Passer un tableau pour title
+              date={new Date(notification.created_at).toLocaleString() || "Date inconnue"}
+            />
+            <IconButton
+              size="small"
+              color="error"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteNotification(notification.id);
+              }}
+            >
+              <Icon>delete</Icon>
+            </IconButton>
+          </MenuItem>
+        ))
+      ) : (
+        <MenuItem disabled>Aucune notification</MenuItem>
+      )}
     </Menu>
   );
 
   return (
     <>
-      <RealtimeAlert idChild={id} onNewAlert={handleNewAlert} />
       <AppBar
         position={absolute ? "absolute" : navbarType}
         color="inherit"
@@ -177,7 +155,12 @@ const DashboardNavbar = ({ absolute, light, isMini, id }) => {
       >
         <Toolbar sx={(theme) => navbarContainer(theme)}>
           <VuiBox color="inherit" mb={{ xs: 1, md: 0 }} sx={(theme) => navbarRow(theme, { isMini })}>
-            <Breadcrumbs icon="home" title={pageTitle} route={route} light={light} />
+            <Breadcrumbs
+              icon="home"
+              title={pageTitle}
+              route={route && route.length > 0 ? route : ["Accueil"]} // Fallback si route est vide
+              light={light}
+            />
           </VuiBox>
           {isMini ? null : (
             <VuiBox sx={(theme) => navbarRow(theme, { isMini })}>

@@ -42,8 +42,8 @@ const ChildDetail = () => {
 
   return (
     <DashboardLayout>
-<DashboardNavbar id={measurementId} />
-      <Card sx={{ maxWidth: 800, margin: "auto", mt: 4, p: 3 }}>
+      <DashboardNavbar id={measurementId} />
+      <Card sx={{ maxWidth: 800, margin: "auto", mt: 4, p: 3 }} style={{ backgroundColor: "transparent" }}>
         <div className="max-w-2xl mx-auto p-4">
           <Typography variant="h5" className="text-2xl font-bold mb-4 white-text">
             Détails des enfants
@@ -64,7 +64,7 @@ const ChildDetail = () => {
                   }}
                   className="child-card"
                 >
-                  <Typography  className="white-text">
+                  <Typography className="white-text">
                     <strong>Nom :</strong> {child.LastName}
                   </Typography>
                   <Typography className="white-text">
@@ -93,6 +93,13 @@ const ChildDetail = () => {
                   </Typography>
                   <Typography className="white-text">
                     <strong>Allergies ou restrictions alimentaires :</strong> {child.AllergiesOrDietaryRestrictions}
+                  </Typography>
+                  {/* Ajout des champs Height et Width */}
+                  <Typography className="white-text">
+                    <strong>Hauteur :</strong> {child.Height} cm
+                  </Typography>
+                  <Typography className="white-text">
+                    <strong>Largeur :</strong> {child.Width} cm
                   </Typography>
 
                   {/* Modifier button */}

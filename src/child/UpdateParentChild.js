@@ -6,7 +6,7 @@ import DashboardNavbar from "examples/Navbars/DashboardNavbar";
 import { Box, Button } from "@mui/material"; // Importation de Box et Button
 
 const UpdateChildForm = () => {
-  const { id, parentId } = useParams(); // Récupération de l'ID de l'enfant et du parent
+  const { id } = useParams(); // Récupération de l'ID de l'enfant (suppression de parentId)
   const history = useHistory();
   const [formData, setFormData] = useState({
     LastName: "",
@@ -19,7 +19,8 @@ const UpdateChildForm = () => {
     ModeOfCommunication: "",
     CalmingStrategies: "",
     AllergiesOrDietaryRestrictions: "",
-    id_userParent: "", // Ajout pour vérifier le bon parent
+    Height: "", // Ajout de Height
+    Width: "",  // Ajout de Width
   });
 
   useEffect(() => {
@@ -43,10 +44,12 @@ const UpdateChildForm = () => {
         ModeOfCommunication: formData.ModeOfCommunication,
         CalmingStrategies: formData.CalmingStrategies,
         AllergiesOrDietaryRestrictions: formData.AllergiesOrDietaryRestrictions,
+        Height: formData.Height, // Ajout de Height
+        Width: formData.Width,   // Ajout de Width
       };
-      await updateChildGeneral(id, parentId, updatedFields); // Appel avec ID enfant et ID parent
+      await updateChildGeneral(id, updatedFields); // Appel avec ID enfant uniquement
       alert("Enfant mis à jour avec succès");
-      history.push("/child/ChildList");
+      history.push("/child/ChildDetailParent");
     } catch (error) {
       console.error("Erreur lors de la mise à jour", error);
       alert("Erreur lors de la mise à jour de l'enfant");
@@ -131,6 +134,31 @@ const UpdateChildForm = () => {
               />
               <div className="underline"></div>
               <label>Allergies ou restrictions alimentaires</label>
+            </div>
+          </div>
+          {/* Ajout des champs Height et Width */}
+          <div className="form-row">
+            <div className="input-data">
+              <input
+                type="number"
+                name="Height"
+                value={formData.Height}
+                onChange={handleChange}
+                required
+              />
+              <div className="underline"></div>
+              <label>Hauteur (en cm)</label>
+            </div>
+            <div className="input-data">
+              <input
+                type="number"
+                name="Width"
+                value={formData.Width}
+                onChange={handleChange}
+                required
+              />
+              <div className="underline"></div>
+              <label>Largeur (en cm)</label>
             </div>
           </div>
           <br />

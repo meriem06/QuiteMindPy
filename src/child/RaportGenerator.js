@@ -1,15 +1,26 @@
-import { useParams } from "react-router-dom"; // Ensure this import is present
+import { useParams, useHistory } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@mui/material";
 import { motion, AnimatePresence } from "framer-motion";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
+import { PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
 import DashboardLayout from "examples/LayoutContainers/DashboardLayout";
 import DashboardNavbar from "examples/Navbars/DashboardNavbar";
 import "./styles.css";
 import RealtimeAlert from "./RealTimeAlert";
+import { Box, Button } from "@mui/material";
+import L from "leaflet";
 
+const customIcon = new L.Icon({
+  iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
+  shadowSize: [41, 41],
+});
 // MapComponent avec validation des coordonnées
 const MapComponent = ({ latitude, longitude }) => {
   const isValidLatitude = typeof latitude === "number" && latitude >= -90 && latitude <= 90;
@@ -29,7 +40,7 @@ const MapComponent = ({ latitude, longitude }) => {
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       />
-      <Marker position={[latitude, longitude]}>
+      <Marker position={[latitude, longitude]} icon={customIcon}>
         <Popup>Position actuelle</Popup>
       </Marker>
     </MapContainer>
@@ -37,29 +48,31 @@ const MapComponent = ({ latitude, longitude }) => {
 };
 
 const ReportGenerator = () => {
-  const { childid } = useParams(); // Ensure this is used correctly
+  const { childid } = useParams();
   const [reports, setReports] = useState([]);
-  const [chartData, setChartData] = useState([]); // État pour les données historiques des graphiques
+  const [chartData, setChartData] = useState([]);
   const [measurementId, setMeasurementId] = useState(null);
+  const history = useHistory();
+
   const handleNewMeasurement = (id) => {
     setMeasurementId(id);
   };
 
+  // Récupération des données en temps réel
   useEffect(() => {
     const eventSource = new EventSource(`http://localhost:3001/api/sensors/sensors/realtime/${childid}`);
 
     eventSource.onmessage = (event) => {
       const newData = JSON.parse(event.data);
-      console.log("Received sensor data:", newData); // Debugging
 
       if (newData && typeof newData === "object") {
-        // Mettre à jour reports avec la dernière donnée reçue
-        const newReport = {
-          id: reports.length + 1,
-          timestamp: new Date().toLocaleString(),
-          data: [newData],
-        };
-        setReports([newReport]);
+        setReports((prevReports) => [
+          {
+            id: prevReports.length + 1,
+            timestamp: new Date().toLocaleString(),
+            data: [newData],
+          },
+        ]);
       } else {
         console.error("Données reçues invalides :", newData);
       }
@@ -73,8 +86,9 @@ const ReportGenerator = () => {
     return () => {
       eventSource.close();
     };
-  }, [childid, reports]); // On ne met plus `chartData` comme dépendance
+  }, [childid]);
 
+  // Récupération des données historiques
   useEffect(() => {
     const fetchHistoricalData = async () => {
       try {
@@ -83,25 +97,43 @@ const ReportGenerator = () => {
           throw new Error("Erreur lors de la récupération des données historiques");
         }
         const data = await response.json();
-        console.log("Received historical data:", data); // Debugging
-  
+
         // Formater les données pour recharts
         const formattedData = data.map((measurement) => ({
           id: measurement.id,
           name: new Date(measurement.timestamp).toLocaleString(),
-          heart_beat: measurement.heart_beat,
-          temperature: measurement.temperature,
+          heart_beat: measurement.Heartbeat,
+          temperature: measurement.Temperature,
+          sound: parseFloat(measurement.sound) || 0, // Convertir le son en nombre
         }));
-  
-        console.log("Formatted chartData:", formattedData); // Debugging
+
         setChartData(formattedData);
       } catch (error) {
         console.error("Erreur :", error);
       }
     };
-  
+
     fetchHistoricalData();
   }, [childid]);
+
+  // Calculer les pourcentages pour le PieChart
+  const calculatePercentages = (data) => {
+    if (!data || data.length === 0) return [];
+
+    const latestData = data[data.length - 1]; // Prendre les dernières données
+    const total = latestData.heart_beat + latestData.temperature + latestData.sound;
+
+    return [
+      { name: "Heart Beat", value: (latestData.heart_beat / total) * 100 },
+      { name: "Temperature", value: (latestData.temperature / total) * 100 },
+      { name: "Sound", value: (latestData.sound / total) * 100 },
+    ];
+  };
+
+  const pieData = calculatePercentages(chartData);
+
+  // Couleurs pour les segments du PieChart
+  const COLORS = ["#0088FE", "#00C49F", "#FFBB28"];
 
   const getEmotionalState = (heartBeat, temperature) => {
     if (heartBeat > 100 && temperature > 37) return "Stressé";
@@ -127,9 +159,10 @@ const ReportGenerator = () => {
         <h2 className="text-2xl font-bold white-text mb-8">Rapport en temps réel</h2>
 
         {reports.length > 0 && reports[0].data && reports[0].data[0] ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Cadre pour le texte animé */}
-            <Card className="dark-background">
+          <div className="flex flex-wrap gap-8">
+            <br></br>
+            {/* Cadre pour les données en temps réel */}
+            <Card className="dark-background flex-1 min-w-[300px]">
               <CardContent className="p-8">
                 <AnimatePresence mode="wait">
                   <motion.div
@@ -156,7 +189,7 @@ const ReportGenerator = () => {
                         animate={{ scale: 1, opacity: 1 }}
                         transition={{ duration: 0.5, delay: 0.2 }}
                       >
-                        {reports[0].data[0].heart_beat}
+                        {reports[0].data[0].Heartbeat}
                         <span className="text-xl ml-2">bpm</span>
                       </motion.div>
 
@@ -166,17 +199,27 @@ const ReportGenerator = () => {
                         animate={{ scale: 1, opacity: 1 }}
                         transition={{ duration: 0.5, delay: 0.4 }}
                       >
-                        {reports[0].data[0].temperature}
+                        {reports[0].data[0].Temperature}
                         <span className="text-xl ml-2">°C</span>
+                      </motion.div>
+
+                      <motion.div
+                        className="text-3xl font-semibold text-center white-text"
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ duration: 0.5, delay: 0.6 }}
+                      >
+                        {reports[0].data[0].sound}
+                        <span className="text-xl ml-2">dB</span>
                       </motion.div>
                     </div>
                   </motion.div>
                 </AnimatePresence>
               </CardContent>
             </Card>
-
+            <br></br>
             {/* Cadre pour l'état émotionnel */}
-            <Card className="dark-background">
+            <Card className="dark-background flex-1 min-w-[300px]">
               <CardContent className="p-8">
                 <AnimatePresence mode="wait">
                   <motion.div
@@ -202,18 +245,15 @@ const ReportGenerator = () => {
                       animate={{ scale: 1, opacity: 1 }}
                       transition={{ duration: 0.5, delay: 0.2 }}
                     >
-                      {getEmotionalState(
-                        reports[0].data[0].heart_beat,
-                        reports[0].data[0].temperature
-                      )}
+                      {getEmotionalState(reports[0].data[0].Heartbeat, reports[0].data[0].Temperature)}
                     </motion.div>
                   </motion.div>
                 </AnimatePresence>
               </CardContent>
             </Card>
-
+            <br></br>
             {/* Cadre pour l'état de santé */}
-            <Card className="dark-background">
+            <Card className="dark-background flex-1 min-w-[300px]">
               <CardContent className="p-8">
                 <AnimatePresence mode="wait">
                   <motion.div
@@ -239,66 +279,55 @@ const ReportGenerator = () => {
                       animate={{ scale: 1, opacity: 1 }}
                       transition={{ duration: 0.5, delay: 0.2 }}
                     >
-                      {getHealthStatus(
-                        reports[0].data[0].heart_beat,
-                        reports[0].data[0].temperature
-                      )}
+                      {getHealthStatus(reports[0].data[0].Heartbeat, reports[0].data[0].Temperature)}
                     </motion.div>
                   </motion.div>
                 </AnimatePresence>
               </CardContent>
             </Card>
-
+            <br></br>
             {/* Cadre pour la carte OpenStreetMap */}
-            <Card className="col-span-1 md:col-span-2">
+            <Card className="w-full">
               <CardContent className="p-8">
-                <h4 style={{ color: "white" }} className="graph-title" color="white">Localisation</h4>
-                <MapComponent
-                  latitude={reports[0].data[0].Latitude}
-                  longitude={reports[0].data[0].Longitude}
-                />
+                <h4 style={{ color: "white" }} className="graph-title">
+                  Localisation
+                </h4>
+                <MapComponent latitude={reports[0].data[0].Latitude} longitude={reports[0].data[0].Longitude} />
               </CardContent>
             </Card>
-
-            {/* Cadre pour le graphique des battements de cœur */}
-            <Card className="col-span-1 md:col-span-2">
-              <CardContent className="p-8">
-                <h4 style={{ color: "white" }} className="graph-title">Battements de cœur</h4>
-                <BarChart
-                  width={600}
-                  height={300}
-                  data={chartData}
-                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="heart_beat" fill="#8884d8" />
-                </BarChart>
-              </CardContent>
-            </Card>
-
-            {/* Cadre pour le graphique de la température */}
-            <Card className="col-span-1 md:col-span-2">
-              <CardContent className="p-8">
-                <h4 style={{ color: "white" }} className="graph-title">Température</h4>
-                <LineChart
-                  width={600}
-                  height={300}
-                  data={chartData}
-                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="temperature" stroke="#82ca9d" />
-                </LineChart>
-              </CardContent>
-            </Card>
+            <br></br>
+            {/* Cadre pour le graphique circulaire */}
+            <Card className="pie-chart-card">
+  <CardContent className="p-8">
+    <h4 className="pie-chart-title">Données en pourcentage</h4>
+    <div className="pie-chart-container">
+      <PieChart width={600} height={400}>
+        <Pie
+          data={pieData}
+          cx="50%"
+          cy="50%"
+          labelLine={false}
+          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(2)}%`}
+          outerRadius={150}
+          fill="#8884d8"
+          dataKey="value"
+        >
+          {pieData.map((entry, index) => (
+            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+          ))}
+        </Pie>
+        <Tooltip />
+        <Legend />
+      </PieChart>
+    </div>
+  </CardContent>
+</Card>
+            {/* Bouton de retour */}
+            <Box sx={{ display: "flex", justifyContent: "space-between", mt: 4 }}>
+              <Button variant="contained" color="secondary" onClick={() => history.push("/child/ChildDetailParent")}>
+                ⬅ Retour
+              </Button>
+            </Box>
           </div>
         ) : (
           <div className="text-white">En attente de données...</div>
